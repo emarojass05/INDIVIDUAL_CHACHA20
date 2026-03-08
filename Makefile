@@ -1,7 +1,5 @@
-CC=riscv64-linux-gnu-gcc
-
 all:
-	$(CC) -Wall -g -static src/main.c asm/quarter_round.S -o main
+	riscv64-linux-gnu-gcc -Wall -g -static src/main.c asm/chacha20_block.S asm/quarter_round.S -o main
 
 run:
 	qemu-riscv64 ./main
