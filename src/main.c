@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
-/* funciones implementadas en assembly */
+/* funciones en assembly */
 
 extern void chacha20_quarter_round(
     uint32_t *a,
@@ -17,6 +18,15 @@ extern void chacha20_block(
     uint32_t output[16]
 );
 
+extern void chacha20_encrypt(
+    uint8_t *plaintext,
+    uint8_t *ciphertext,
+    uint32_t len,
+    uint32_t key[8],
+    uint32_t counter,
+    uint32_t nonce[3]
+);
+
 int main() {
 
     printf("=== Test Quarter Round ===\n\n");
@@ -26,12 +36,12 @@ int main() {
     uint32_t c = 0x9b8d6f43;
     uint32_t d = 0x01234567;
 
-    chacha20_quarter_round(&a, &b, &c, &d);
+    chacha20_quarter_round(&a,&b,&c,&d);
 
-    printf("a = %08x\n", a);
-    printf("b = %08x\n", b);
-    printf("c = %08x\n", c);
-    printf("d = %08x\n", d);
+    printf("a = %08x\n",a);
+    printf("b = %08x\n",b);
+    printf("c = %08x\n",c);
+    printf("d = %08x\n",d);
 
     printf("\n=== Test ChaCha20 Block ===\n\n");
 
@@ -53,14 +63,37 @@ int main() {
     };
 
     uint32_t counter = 1;
-
     uint32_t output[16];
 
-    chacha20_block(key, counter, nonce, output);
+    chacha20_block(key,counter,nonce,output);
 
-    for (int i = 0; i < 16; i++) {
-        printf("%08x\n", output[i]);
-    }
+    for(int i=0;i<16;i++)
+        printf("%08x\n",output[i]);
+
+    printf("\n=== Test ChaCha20 Encrypt ===\n\n");
+
+    uint8_t plaintext[] = "Hello ChaCha20 encryption!";
+    uint8_t ciphertext[128];
+
+    memset(ciphertext,0,sizeof(ciphertext));
+
+    chacha20_encrypt(
+        plaintext,
+        ciphertext,
+        strlen((char*)plaintext),
+        key,
+        counter,
+        nonce
+    );
+
+    printf("Plaintext:\n%s\n\n",plaintext);
+
+    printf("Ciphertext (hex):\n");
+
+    for(int i=0;i<strlen((char*)plaintext);i++)
+        printf("%02x ",ciphertext[i]);
+
+    printf("\n");
 
     return 0;
 }
