@@ -13,7 +13,6 @@
 
 chacha20_encrypt:
 
-    # reservar stack
     addi sp,sp,-128
 
     sd ra,120(sp)
@@ -22,19 +21,19 @@ chacha20_encrypt:
     sd s2,96(sp)
     sd s3,88(sp)
     sd s4,80(sp)
+    sd s5,72(sp)
 
-    # guardar argumentos en registros preservados
     mv s0,a0      # plaintext
     mv s1,a1      # ciphertext
-    mv s2,a2      # length
-    mv s3,a4      # counter
+    mv s2,a2      # remaining length
+    mv s3,a4      # current counter
     mv s4,a5      # nonce
+    mv s5,a4      # original counter
 
 encrypt_loop:
 
     beq s2,zero,encrypt_done
 
-    # generar bloque de keystream
     mv a0,a3
     mv a1,s3
     mv a2,s4
@@ -42,7 +41,6 @@ encrypt_loop:
 
     call chacha20_block
 
-    # bytes a procesar en este bloque
     li t0,64
     blt s2,t0,block_len_ok
     mv t1,t0
@@ -53,29 +51,27 @@ block_len_ok:
 
 xor_start:
 
-    li t2,0
+    mv t2,s0
+    mv t3,s1
+    addi t4,sp,0
+    li t5,0
 
 xor_loop:
 
-    bge t2,t1,next_block
+    bge t5,t1,next_block
 
-    # leer plaintext
-    add t3,s0,t2
-    lbu t4,0(t3)
+    lbu t6,0(t2)
+    lbu t0,0(t4)
 
-    # leer keystream
-    addi t5,sp,0
-    add t5,t5,t2
-    lbu t6,0(t5)
+    xor t6,t6,t0
 
-    # XOR
-    xor t4,t4,t6
-
-    # guardar ciphertext
-    add t3,s1,t2
-    sb t4,0(t3)
+    sb t6,0(t3)
 
     addi t2,t2,1
+    addi t3,t3,1
+    addi t4,t4,1
+
+    addi t5,t5,1
     j xor_loop
 
 next_block:
@@ -90,6 +86,7 @@ next_block:
 
 encrypt_done:
 
+    ld s5,72(sp)
     ld s4,80(sp)
     ld s3,88(sp)
     ld s2,96(sp)
