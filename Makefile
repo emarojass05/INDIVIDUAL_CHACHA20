@@ -13,8 +13,18 @@ TARGET=main
 all:
 	$(CC) $(CFLAGS) $(SRC) -o $(TARGET)
 
+
 run:
-	qemu-riscv64 ./main
+	pkill qemu-riscv64 2>/dev/null || true
+	qemu-riscv64 -g 1234 ./$(TARGET)
+
+normal:
+	qemu-riscv64 ./$(TARGET)
+
+
+debug:
+	gdb-multiarch $(TARGET)
+
 
 clean:
 	rm -f $(TARGET)
