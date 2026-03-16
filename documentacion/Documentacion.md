@@ -35,28 +35,50 @@ La operación fundamental del algoritmo es el quarter round.
 
 # 3. Quarter Round
 
-El quarter round mezcla cuatro palabras de 32 bits mediante operaciones de suma, XOR y rotaciones de bits.
+El *quarter round* es la operación fundamental del algoritmo ChaCha20.  
+Esta operación mezcla cuatro palabras de 32 bits utilizando operaciones de suma modular, XOR y rotaciones de bits.
 
-Operaciones:
+Las operaciones que definen el quarter round son:
 
 a += b; d ^= a; d <<< 16  
 c += d; b ^= c; b <<< 12  
 a += b; d ^= a; d <<< 8  
 c += d; b ^= c; b <<< 7  
 
-Esta operación introduce difusión y no linealidad en el estado.
+Estas operaciones introducen **difusión y no linealidad** en el estado interno del algoritmo.
 
-La implementación se encuentra en:
+La implementación de esta función se encuentra en:
 
 asm/quarter_round.S
 
-Evidencia de ejecución:
+## Implementación de rotaciones en RISC-V
 
-![](images/quarter_round.png)  
+El algoritmo ChaCha20 utiliza rotaciones de bits sobre palabras de 32 bits.  
+Sin embargo, la ISA base de RISC-V no incluye una instrucción de rotación directa, por lo que estas se implementan utilizando instrucciones de desplazamiento lógico y una operación OR.
+
+Una rotación a la izquierda se implementa de la siguiente manera:
+
+(x <<< n) = (x << n) | (x >> (32 − n))
+
+Por ejemplo, la rotación de 7 bits utilizada en el quarter round se implementa en ensamblador como:
+
+slliw t4,t1,7  
+srliw t5,t1,25  
+or t1,t4,t5  
+
+Las instrucciones terminadas en **`w`** operan sobre palabras de **32 bits**, lo cual coincide con el tamaño de las palabras utilizadas por el algoritmo ChaCha20.
+
+El algoritmo ChaCha20 se basa en el modelo **ARX (Addition, Rotation, XOR)**, el cual resulta eficiente de implementar en arquitecturas RISC como RISC-V.
+
+## Evidencia de ejecución
+
+Las siguientes capturas muestran la ejecución del quarter round durante la depuración con GDB y la verificación del vector de prueba del RFC.
+
+![](images/quarter_round.png)
+
 ![](images/print_quarter_round.png)
 
 ---
-
 # 4. ChaCha20 Block Function
 
 La función chacha20_block genera un bloque de keystream de 64 bytes.
