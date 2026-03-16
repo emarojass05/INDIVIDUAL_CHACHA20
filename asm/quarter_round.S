@@ -62,5 +62,5 @@ chacha20_quarter_round:
     sw t1,0(a1)
     sw t2,0(a2)
     sw t3,0(a3)
-
+quarter_round_end:
     ret

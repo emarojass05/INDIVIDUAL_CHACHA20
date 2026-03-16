@@ -241,5 +241,5 @@ store_done:
     ld ra,184(sp)
 
     addi sp,sp,192
-
+block_end:
     ret
