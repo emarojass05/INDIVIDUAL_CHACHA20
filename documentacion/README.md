@@ -20,7 +20,7 @@ El objetivo del proyecto es demostrar conocimientos en:
 - Manejo eficiente de registros
 - Implementación de algoritmos criptográficos a bajo nivel
 - Integración entre C y ensamblador
-- Depuración utilizando GDB y QEMU
+- Depuración utilizando **GDB y QEMU**
 
 El algoritmo ChaCha20 está definido en el **RFC 8439** y se basa en operaciones simples y eficientes:
 
@@ -30,44 +30,77 @@ El algoritmo ChaCha20 está definido en el **RFC 8439** y se basa en operaciones
 
 El proyecto implementa las siguientes funciones principales:
 
-- `quarter_round`
+- `chacha20_quarter_round`
 - `chacha20_block`
 - `chacha20_encrypt`
 
-El programa principal en C permite probar cada una de estas funciones y verificar su funcionamiento.
+Estas funciones están implementadas completamente en **ensamblador RISC-V**, mientras que el programa principal está escrito en **C** y se encarga de ejecutar pruebas y verificar los resultados.
 
 ---
 
-# 2. Estructura del repositorio
+# 2. Arquitectura del software
+
+El proyecto se divide en dos capas:
+
+## C (control y pruebas)
+
+El archivo `main.c` se encarga de:
+
+- preparar los datos de prueba
+- llamar a las funciones en ensamblador
+- imprimir resultados
+- verificar la corrección del algoritmo
+
+## Assembly (implementación del algoritmo)
+
+Las funciones críticas del algoritmo se implementan en ensamblador.
+
+Flujo de ejecución del programa:
+
+```
+main.c
+   ↓
+chacha20_encrypt
+   ↓
+chacha20_block
+   ↓
+chacha20_quarter_round
+```
+
+Cada bloque ChaCha20 ejecuta **20 rondas** que transforman el estado interno del cifrado.
+
+---
+
+# 3. Estructura del repositorio
 
 ```
 INDIVIDUAL_CHACHA20
 │
 ├── asm
-│   ├── quarter_round.S        # Implementación del quarter round
-│   ├── chacha20_block.S       # Implementación del bloque ChaCha20
-│   └── chacha20_encrypt.S     # Implementación del cifrado completo
+│   ├── quarter_round.S
+│   ├── chacha20_block.S
+│   └── chacha20_encrypt.S
 │
 ├── src
-│   └── main.c                 # Programa principal en C
+│   └── main.c
 │
 ├── examples
-│   └── baremetal              # Ejemplo de ejecución bare-metal
+│   └── baremetal
 │       ├── test.s
 │       ├── linker.ld
 │       ├── build.sh
 │       └── run-qemu.sh
 │
 ├── scripts
-│   ├── build-image.sh         # Construcción de la imagen Docker
-│   └── run-container.sh       # Ejecución del contenedor
+│   ├── build-image.sh
+│   └── run-container.sh
 │
 ├── docker
-│   └── Dockerfile             # Entorno de desarrollo RISC-V
+│   └── Dockerfile
 │
 ├── tests
 │
-├── Makefile                   # Sistema de compilación
+├── Makefile
 │
 ├── README.md
 └── DOCUMENTACION.md
@@ -75,13 +108,18 @@ INDIVIDUAL_CHACHA20
 
 ---
 
-# 3. Requisitos previos
+# 4. Requisitos previos
 
 Para ejecutar el proyecto se requiere:
 
-## Docker
+- Docker
+- QEMU
+- Toolchain RISC-V
+- GDB multiarch
 
-Docker se utiliza para reproducir el entorno de desarrollo utilizado en el curso.
+---
+
+## Docker
 
 Instalar Docker en Ubuntu:
 
@@ -96,7 +134,7 @@ sudo systemctl start docker
 sudo systemctl enable docker
 ```
 
-Agregar el usuario al grupo docker:
+Agregar usuario al grupo docker:
 
 ```bash
 sudo usermod -aG docker $USER
@@ -111,56 +149,47 @@ docker --version
 
 ---
 
-## Toolchain RISC-V
+# 5. Toolchain RISC-V
 
-El proyecto utiliza:
+El proyecto ChaCha20 se compila con:
 
 ```
 riscv64-linux-gnu-gcc
 ```
 
-Dentro del contenedor Docker se utiliza:
+Este compilador permite utilizar funciones estándar de C como:
+
+- `printf`
+- `strlen`
+
+El ejemplo incluido en `examples/baremetal` utiliza en cambio:
 
 ```
 riscv64-unknown-elf-gcc
 ```
 
----
-
-## QEMU
-
-Para ejecutar programas RISC-V:
-
-```
-qemu-riscv64
-```
-
-Para ejecutar en modo bare metal:
-
-```
-qemu-system-riscv32
-```
+porque se ejecuta en **modo bare-metal sin sistema operativo**.
 
 ---
 
-# 4. Construcción del entorno Docker
+# 6. Construcción del entorno Docker
 
-Construir la imagen Docker desde la raíz del proyecto:
+Desde la raíz del proyecto ejecutar:
 
 ```bash
 ./scripts/build-image.sh
 ```
 
-Esto crea una imagen con:
+Esto construye una imagen Docker con:
 
-- Toolchain RISC-V
+- toolchain RISC-V
 - QEMU
 - GDB
-- entorno completo de compilación
+- dependencias necesarias para compilar
 
 ---
 
-# 5. Ejecutar el contenedor Docker
+# 7. Ejecutar el contenedor Docker
 
 Ejecutar:
 
@@ -168,9 +197,7 @@ Ejecutar:
 ./scripts/run-container.sh
 ```
 
-Esto abrirá una terminal dentro del contenedor.
-
-Ejemplo:
+Esto abrirá una terminal dentro del contenedor:
 
 ```
 [rvqemu-dev@container workspace]$
@@ -178,15 +205,15 @@ Ejemplo:
 
 ---
 
-# 6. Compilar el proyecto
+# 8. Compilar el proyecto
 
-Dentro del contenedor o en el entorno configurado ejecutar:
+Dentro del contenedor ejecutar:
 
 ```bash
 make
 ```
 
-Esto compila los siguientes archivos:
+Esto compila los archivos:
 
 ```
 src/main.c
@@ -203,7 +230,7 @@ main
 
 ---
 
-# 7. Ejecutar el programa
+# 9. Ejecutar el programa
 
 Para ejecutar el programa:
 
@@ -211,9 +238,9 @@ Para ejecutar el programa:
 make run
 ```
 
-Esto ejecuta el programa con el emulador RISC-V:
+Esto ejecuta el programa utilizando el emulador:
 
-```bash
+```
 qemu-riscv64 ./main
 ```
 
@@ -226,31 +253,17 @@ a = ea2a92f4
 b = cb1cf8ce
 c = 4581472e
 d = 5881c4bb
-
-=== Test ChaCha20 Block ===
-
-e4e7f110
-15593bd1
-1fdd0f50
-c47120a3
-...
-
-=== Test ChaCha20 Encrypt ===
-
-Plaintext:
-Hello ChaCha20 encryption!
-
-Ciphertext (hex):
-...
 ```
 
 ---
 
-# 8. Verificación con vectores del RFC
+# 10. Ejecución de los casos de prueba
 
-El proyecto utiliza los vectores de prueba definidos en **RFC 8439**.
+El programa ejecuta tres pruebas principales.
 
-Vector de prueba para quarter round:
+### Quarter Round
+
+Verifica la operación básica del algoritmo usando los valores definidos en el RFC.
 
 Entrada:
 
@@ -270,45 +283,35 @@ c = 0x4581472e
 d = 0x5881c4bb
 ```
 
-Si el programa produce estos valores, la implementación es correcta.
+### ChaCha20 Block
+
+Genera un bloque de keystream utilizando la función `chacha20_block`.
+
+### ChaCha20 Encrypt
+
+Cifra un mensaje utilizando el algoritmo completo.
+
+Si la implementación es correcta, el programa mostrará:
+
+```
+SUCCESS: plaintext recovered correctly
+```
 
 ---
 
-# 9. Ejecución en modo Bare Metal
+# 11. Depuración con GDB
 
-El repositorio incluye un ejemplo para ejecutar código en modo **bare metal**.
+El proyecto permite depurar la ejecución utilizando **QEMU y GDB**.
 
-## Paso 1 — Entrar al contenedor
+## Terminal 1
 
-```bash
-docker exec -it rvqemu /bin/bash
-```
-
-## Paso 2 — Ir al ejemplo bare metal
+Ejecutar el programa con soporte de depuración:
 
 ```bash
-cd /home/rvqemu-dev/workspace/examples/baremetal
+make run
 ```
 
-## Paso 3 — Compilar el programa
-
-```bash
-./build.sh
-```
-
-Esto genera:
-
-```
-test.elf
-```
-
-## Paso 4 — Ejecutar QEMU
-
-```bash
-./run-qemu.sh
-```
-
-Esto inicia QEMU con un servidor de depuración GDB en el puerto:
+Esto inicia QEMU con un servidor GDB en el puerto:
 
 ```
 1234
@@ -316,23 +319,41 @@ Esto inicia QEMU con un servidor de depuración GDB en el puerto:
 
 ---
 
-# 10. Depuración con GDB
+## Terminal 2
 
-En otra terminal ejecutar:
+Abrir GDB:
 
 ```bash
-docker exec -it rvqemu /bin/bash
-cd /home/rvqemu-dev/workspace/examples/baremetal
-gdb-multiarch test.elf
+make debug
 ```
 
-Conectar con QEMU:
+Conectar con el programa:
 
 ```bash
 target remote :1234
 ```
 
-Comandos útiles:
+Continuar ejecución:
+
+```bash
+continue
+```
+
+---
+
+## Breakpoints útiles
+
+```bash
+break main
+break chacha20_encrypt
+break chacha20_block
+break chacha20_quarter_round
+break encrypt_end
+```
+
+---
+
+## Comandos útiles en GDB
 
 Mostrar registros:
 
@@ -340,40 +361,34 @@ Mostrar registros:
 info registers
 ```
 
-Ejecutar instrucción por instrucción:
+Ejecutar una instrucción:
 
 ```bash
 stepi
 ```
 
-Colocar breakpoint:
+Mostrar memoria del stack:
 
 ```bash
-break _start
-continue
+x/32x $sp
 ```
 
-Mostrar el código ensamblador:
+Mostrar código ensamblador:
 
 ```bash
 layout asm
 ```
 
-Mostrar los registros en pantalla:
+Mostrar registros en pantalla:
 
 ```bash
 layout regs
 ```
 
-Esto permite observar cómo cambian los registros durante la ejecución del programa.
-
 ---
 
-# 11. Referencias
+# 12. Referencias
 
-ChaCha20 está definido en:
+ChaCha20 está definido en: RFC 8439
 
-RFC 8439  
-https://datatracker.ietf.org/doc/html/rfc8439
-
----
+https://www.rfc-editor.org/rfc/rfc8439
