@@ -28,6 +28,8 @@ El algoritmo ChaCha20 está definido en el **RFC 8439** y se basa en operaciones
 - operación XOR
 - rotaciones de bits
 
+ChaCha20 utiliza una matriz de 4x4 palabras de 32 bits (estado interno), sobre la cual se aplican **20 rondas (10 double rounds)** compuestas por operaciones de quarter round en columnas y diagonales.
+
 El proyecto implementa las siguientes funciones principales:
 
 - `chacha20_quarter_round`
@@ -68,6 +70,8 @@ chacha20_quarter_round
 ```
 
 Cada bloque ChaCha20 ejecuta **20 rondas** que transforman el estado interno del cifrado.
+
+Nota: Los datos del RFC se ingresan en formato byte a byte y se convierten a palabras de 32 bits respetando el orden **little-endian** utilizado por ChaCha20.
 
 ---
 
@@ -238,11 +242,13 @@ Para ejecutar el programa:
 make run
 ```
 
-Esto ejecuta el programa utilizando el emulador:
+Esto ejecuta el programa utilizando:
 
 ```
 qemu-riscv64 ./main
 ```
+
+En este modo, QEMU puede iniciarse con soporte de depuración (`-g 1234`), permitiendo la conexión desde GDB.
 
 Salida esperada:
 
@@ -257,13 +263,11 @@ d = 5881c4bb
 
 ---
 
-# 10. Ejecución de los casos de prueba
+# 10. Casos de prueba y validación
 
-El programa ejecuta tres pruebas principales.
+El programa ejecuta múltiples pruebas para validar la implementación.
 
 ### Quarter Round
-
-Verifica la operación básica del algoritmo usando los valores definidos en el RFC.
 
 Entrada:
 
@@ -283,15 +287,17 @@ c = 0x4581472e
 d = 0x5881c4bb
 ```
 
+---
+
 ### ChaCha20 Block
 
 Genera un bloque de keystream utilizando la función `chacha20_block`.
 
+---
+
 ### ChaCha20 Encrypt
 
-Cifra un mensaje utilizando el algoritmo completo.
-
-Si la implementación es correcta, el programa mostrará:
+Si la implementación es correcta:
 
 ```
 SUCCESS: plaintext recovered correctly
@@ -299,49 +305,37 @@ SUCCESS: plaintext recovered correctly
 
 ---
 
+### Validación con RFC 8439 (Appendix A)
+
+Se implementó un caso de prueba utilizando los vectores oficiales del RFC.
+
+Para key = 0, nonce = 0, counter = 0:
+
+```
+76 b8 e0 ad a0 f1 3d 90 ...
+```
+
+Esto coincide exactamente con el estándar.
+
+---
+
 # 11. Depuración con GDB
 
-El proyecto permite depurar la ejecución utilizando **QEMU y GDB**.
-
-## Terminal 1
-
-Ejecutar el programa con soporte de depuración:
+Terminal 1:
 
 ```bash
 make run
 ```
 
-Esto inicia QEMU con un servidor GDB en el puerto:
-
-```
-1234
-```
-
----
-
-## Terminal 2
-
-Abrir GDB:
+Terminal 2:
 
 ```bash
 make debug
-```
-
-Conectar con el programa:
-
-```bash
 target remote :1234
-```
-
-Continuar ejecución:
-
-```bash
 continue
 ```
 
----
-
-## Breakpoints útiles
+Breakpoints:
 
 ```bash
 break main
@@ -351,37 +345,13 @@ break chacha20_quarter_round
 break encrypt_end
 ```
 
----
-
-## Comandos útiles en GDB
-
-Mostrar registros:
+Comandos útiles:
 
 ```bash
 info registers
-```
-
-Ejecutar una instrucción:
-
-```bash
 stepi
-```
-
-Mostrar memoria del stack:
-
-```bash
 x/32x $sp
-```
-
-Mostrar código ensamblador:
-
-```bash
 layout asm
-```
-
-Mostrar registros en pantalla:
-
-```bash
 layout regs
 ```
 
@@ -389,6 +359,5 @@ layout regs
 
 # 12. Referencias
 
-ChaCha20 está definido en: RFC 8439
-
+RFC 8439  
 https://www.rfc-editor.org/rfc/rfc8439

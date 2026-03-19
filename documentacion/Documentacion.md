@@ -6,9 +6,6 @@ Este documento describe el diseño e implementación del algoritmo ChaCha20 util
 
 El objetivo del proyecto es comprender cómo implementar primitivas criptográficas de bajo nivel y cómo interactúan con programas escritos en C.
 
-La implementación sigue la especificación definida en:
-
-RFC 8439  
 ---
 
 # 2. Descripción del algoritmo ChaCha20
@@ -19,15 +16,19 @@ El algoritmo genera un keystream de 64 bytes que luego se combina con el texto p
 
 La estructura del estado ChaCha20 consiste en 16 palabras de 32 bits:
 
+```
 constant constant constant constant  
 key key key key  
 key key key key  
 counter nonce nonce nonce  
+```
 
 Cada bloque se procesa mediante 20 rondas organizadas como:
 
 - 10 column rounds
 - 10 diagonal rounds
+
+Estas rondas aplican operaciones ARX (Addition, Rotation, XOR), las cuales proporcionan difusión y seguridad criptográfica.
 
 La operación fundamental del algoritmo es el quarter round.
 
@@ -35,53 +36,66 @@ La operación fundamental del algoritmo es el quarter round.
 
 ## 3. Quarter Round
 
-El *quarter round* es la operación fundamental del algoritmo ChaCha20.  
+El quarter round es la operación fundamental del algoritmo ChaCha20.  
 Esta operación mezcla cuatro palabras de 32 bits utilizando operaciones de suma modular, XOR y rotaciones de bits.
 
 Las operaciones que definen el quarter round son:
 
+```
 a += b; d ^= a; d <<< 16  
 c += d; b ^= c; b <<< 12  
 a += b; d ^= a; d <<< 8  
 c += d; b ^= c; b <<< 7  
+```
 
-Estas operaciones introducen **difusión y no linealidad** en el estado interno del algoritmo.
+Estas operaciones introducen difusión y no linealidad en el estado interno del algoritmo.
 
 La implementación de esta función se encuentra en:
 
+```
 asm/quarter_round.S
+```
+
+---
 
 ## Implementación de rotaciones en RISC-V
 
 El algoritmo ChaCha20 utiliza rotaciones de bits sobre palabras de 32 bits.  
 Sin embargo, la ISA base de RISC-V no incluye una instrucción de rotación directa, por lo que estas se implementan utilizando instrucciones de desplazamiento lógico y una operación OR.
 
-Una rotación a la izquierda se implementa de la siguiente manera:
+Una rotación a la izquierda se implementa como:
 
+```
 (x <<< n) = (x << n) | (x >> (32 − n))
+```
 
-Por ejemplo, la rotación de 7 bits utilizada en el quarter round se implementa en ensamblador como:
+Ejemplo en ensamblador:
 
+```
 slliw t4,t1,7  
 srliw t5,t1,25  
 or t1,t4,t5  
+```
 
-Las instrucciones terminadas en **`w`** operan sobre palabras de **32 bits**, lo cual coincide con el tamaño de las palabras utilizadas por el algoritmo ChaCha20.
+Las instrucciones terminadas en **`w`** operan sobre palabras de **32 bits**, lo cual coincide con el tamaño de las palabras utilizadas por el algoritmo.
 
-El algoritmo ChaCha20 se basa en el modelo **ARX (Addition, Rotation, XOR)**, el cual resulta eficiente de implementar en arquitecturas RISC como RISC-V.
+ChaCha20 se basa en el modelo ARX (Addition, Rotation, XOR), eficiente en arquitecturas RISC.
+
+---
 
 ## Evidencia de ejecución
 
-Las siguientes capturas muestran la ejecución del quarter round durante la depuración con GDB y la verificación del vector de prueba del RFC.
+Las siguientes capturas muestran la ejecución del quarter round y su verificación:
 
 ![](images/quarter_round.png)
 
 ![](images/print_quarter_round.png)
 
 ---
+
 # 4. ChaCha20 Block Function
 
-La función chacha20_block genera un bloque de keystream de 64 bytes.
+La función `chacha20_block` genera un bloque de keystream de 64 bytes.
 
 Pasos principales del algoritmo:
 
@@ -93,13 +107,17 @@ Pasos principales del algoritmo:
 
 Archivo:
 
+```
 asm/chacha20_block.S
+```
 
-Estado inicial del bloque observado durante la depuración:
+Durante la depuración se verificó:
+
+Estado inicial:
 
 ![](images/ini_block_chacha20.png)
 
-También se muestra el estado después de ejecutar las 20 rondas:
+Estado después de 20 rondas:
 
 ![](images/20round.png)
 
@@ -107,27 +125,27 @@ También se muestra el estado después de ejecutar las 20 rondas:
 
 # 5. ChaCha20 Encryption
 
-El cifrado se realiza combinando el keystream con el texto plano:
+El cifrado se realiza mediante:
 
+```
 ciphertext = plaintext XOR keystream
+```
 
-La función chacha20_encrypt se encarga de:
+La función `chacha20_encrypt`:
 
-- generar bloques de keystream
-- aplicar XOR sobre el mensaje
-- incrementar el contador para cada bloque
+- genera bloques de keystream
+- aplica XOR
+- incrementa el contador por bloque
 
 Archivo:
 
+```
 asm/chacha20_encrypt.S
+```
 
-Evidencias de ejecución:
-
-Entrada a la función de cifrado:
+Evidencias:
 
 ![](images/entry_chacha20.png)
-
-Ejecución del cifrado:
 
 ![](images/encrypt.png)
 
@@ -135,139 +153,176 @@ Ejecución del cifrado:
 
 # 6. Mapeo del estado ChaCha20 a registros RISC-V
 
-El estado ChaCha20 consiste en 16 palabras de 32 bits.
-
-Durante la implementación estas palabras se manipulan utilizando registros temporales y memoria en el stack.
+El estado consiste en 16 palabras de 32 bits.
 
 Registros utilizados:
 
-a0–a5  → parámetros de funciones  
-t0–t6  → registros temporales  
-s0–s5  → registros preservados  
-ra     → dirección de retorno  
+```
+a0–a5  → parámetros  
+t0–t6  → temporales  
+s0–s5  → preservados  
+ra     → retorno  
 sp     → stack pointer  
+```
 
-El estado del bloque se almacena temporalmente en el stack frame, lo que permite acceder a las 16 palabras de manera indexada.
-
-Esto facilita la implementación de las rondas y el acceso a los datos durante el proceso de cifrado.
+El estado se almacena en el stack frame, permitiendo acceso indexado eficiente.
 
 ---
 
 # 7. Manejo del Stack Frame
 
-Cada función en ensamblador crea su propio stack frame.
+Cada función crea su stack frame.
 
-Ejemplo en chacha20_encrypt:
+Ejemplo:
 
+```
 addi sp,sp,-128  
 sd ra,120(sp)  
 sd s0,112(sp)  
-sd s1,104(sp)  
+```
 
-El stack se utiliza para:
+Uso del stack:
 
-- guardar registros preservados
-- almacenar temporalmente bloques de keystream
-- facilitar el acceso a estructuras de datos
+- guardar registros
+- almacenar keystream temporal
+- manejar estructuras
 
-Antes de salir de la función se restauran los registros y se libera el stack:
+Restauración:
 
+```
 ld ra,120(sp)  
 addi sp,sp,128  
 ret  
+```
 
 ---
 
 # 8. Integración con C
 
-El archivo src/main.c permite ejecutar pruebas del algoritmo.
+El archivo `src/main.c` ejecuta pruebas:
 
-El programa prueba tres componentes principales:
+1. Quarter round  
+2. Block function  
+3. Cifrado completo  
 
-1. quarter round  
-2. chacha20 block  
-3. cifrado completo  
-
-Esto facilita verificar que la implementación coincide con los vectores del RFC.
+Además, se valida contra el RFC.
 
 ---
 
 # 9. Ejecución en QEMU
 
-El proyecto se ejecuta utilizando el emulador RISC-V:
+El programa se ejecuta con:
 
+```
 qemu-riscv64 ./main
+```
 
-Esto permite ejecutar código RISC-V en una máquina x86.
+Esto permite correr código RISC-V en arquitectura x86.
 
 ---
 
 # 10. Depuración con GDB
 
-El proyecto permite depurar la ejecución utilizando:
+Se utiliza:
 
+```
 gdb-multiarch
+```
 
-Conectándose a QEMU mediante:
+Conexión:
 
+```
 target remote :1234
+```
 
-Esto permite:
+Permite:
 
 - inspeccionar registros
-- ejecutar instrucciones paso a paso
-- observar el flujo del programa
-- verificar el estado interno del algoritmo
+- ejecutar paso a paso
+- validar estados internos
 
-Durante la depuración se pueden colocar breakpoints en funciones clave:
+Breakpoints:
 
+```
 break chacha20_encrypt  
 break chacha20_block  
 break chacha20_quarter_round  
+```
 
 ---
 
 # 11. Resultados
 
-Las pruebas ejecutadas coinciden con los vectores de prueba definidos en el RFC.
+Los resultados coinciden con los vectores oficiales del RFC.
 
-Ejemplo de salida del block function:
+Ejemplo:
 
+```
 10f1e7e4  
 d13b5915  
 500fdd1f  
 a32071c4  
+```
 
-Esto confirma que la implementación del algoritmo ChaCha20 es correcta.
+Además, el keystream del Appendix A.1 coincide exactamente:
+
+```
+76 b8 e0 ad a0 f1 3d 90 ...
+```
+
+Esto confirma la correcta implementación.
 
 ---
 
 # 12. Bitácora de bug
 
-Durante el desarrollo se encontró un error relacionado con el manejo del contador del algoritmo ChaCha20.
+Se detectó un error en el manejo del contador.
 
-Inicialmente el contador no se restauraba correctamente antes del proceso de descifrado, lo que producía un keystream distinto y causaba que el texto descifrado fuera incorrecto.
+Problema:
 
-El problema se detectó durante la depuración utilizando GDB al observar los registros en la función chacha20_encrypt.
+- el contador no se reiniciaba antes del descifrado
 
-La solución consistió en guardar el contador original en un registro preservado y restaurarlo antes de iniciar el proceso de descifrado.
+Efecto:
 
-Una vez corregido el problema, el algoritmo produjo resultados correctos y el proceso de cifrado y descifrado funcionó correctamente.
+- keystream incorrecto
+- texto corrupto
 
-Este error fue corregido durante el desarrollo y por esta razón no se tomó una captura del estado incorrecto.
+Solución:
+
+- restaurar contador antes de descifrar
+
+El error fue identificado mediante GDB, cabe recalcar que no hay foto del bug porque fue encontrado con anterioridad y no se le tomo foto por lo mismo.
 
 ---
 
 # 13. Conclusiones
 
-El proyecto demuestra que es posible implementar algoritmos criptográficos modernos en ensamblador RISC-V manteniendo eficiencia y claridad.
+Se logró implementar ChaCha20 correctamente en ensamblador RISC-V.
 
-Durante el desarrollo se logró comprender:
+Se comprendieron:
 
-- el funcionamiento interno del algoritmo ChaCha20
-- la implementación de operaciones criptográficas en ensamblador
-- el uso de registros y stack en RISC-V
-- la interacción entre programas escritos en C y ensamblador
-- el uso de herramientas de depuración como QEMU y GDB
+- operaciones ARX
+- manejo de registros y stack
+- integración C + Assembly
+- depuración con herramientas reales
 
-La implementación final produce resultados consistentes con los vectores definidos en el RFC, confirmando la correcta funcionalidad del algoritmo.
+La implementación coincide con el RFC, validando su correcta funcionalidad.
+
+---
+
+# 14. Referencias
+
+- RFC 8439 — ChaCha20 and Poly1305 for IETF Protocols  
+  https://www.rfc-editor.org/rfc/rfc8439
+
+- The RISC-V Instruction Set Manual  
+  https://riscv.org/technical/specifications/
+
+- Patterson, D. A., & Hennessy, J. L.  
+  Computer Organization and Design RISC-V Edition
+
+- QEMU Documentation  
+  https://www.qemu.org/docs/
+
+- GDB Documentation  
+  https://sourceware.org/gdb/documentation/
