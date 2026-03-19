@@ -33,7 +33,7 @@ La operación fundamental del algoritmo es el quarter round.
 
 ---
 
-# 3. Quarter Round
+## 3. Quarter Round
 
 El *quarter round* es la operación fundamental del algoritmo ChaCha20.  
 Esta operación mezcla cuatro palabras de 32 bits utilizando operaciones de suma modular, XOR y rotaciones de bits.
