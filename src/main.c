@@ -29,9 +29,34 @@ extern void chacha20_encrypt(
 
 void print_hex(uint8_t *data, int len)
 {
-    for(int i = 0; i < len; i++)
+    for(int i = 0; i < len; i++) {
         printf("%02x ", data[i]);
+        if((i+1)%16==0) printf("\n");
+    }
     printf("\n");
+}
+
+/* convertir bytes → uint32_t */
+void bytes_to_words(uint8_t *in, uint32_t *out, int words)
+{
+    for(int i = 0; i < words; i++) {
+        out[i] =
+            ((uint32_t)in[i*4 + 0]) |
+            ((uint32_t)in[i*4 + 1] << 8) |
+            ((uint32_t)in[i*4 + 2] << 16) |
+            ((uint32_t)in[i*4 + 3] << 24);
+    }
+}
+
+/* convertir uint32_t → bytes */
+void words_to_bytes(uint32_t *in, uint8_t *out, int words)
+{
+    for(int i = 0; i < words; i++) {
+        out[i*4 + 0] = (in[i] >> 0) & 0xFF;
+        out[i*4 + 1] = (in[i] >> 8) & 0xFF;
+        out[i*4 + 2] = (in[i] >> 16) & 0xFF;
+        out[i*4 + 3] = (in[i] >> 24) & 0xFF;
+    }
 }
 
 int main()
@@ -96,32 +121,16 @@ int main()
 
     printf("Plaintext:\n%s\n\n", plaintext);
 
-    chacha20_encrypt(
-        plaintext,
-        ciphertext,
-        len,
-        key,
-        counter,
-        nonce
-    );
+    chacha20_encrypt(plaintext, ciphertext, len, key, counter, nonce);
 
     printf("=== Test Encrypt ===\n");
     print_hex(ciphertext, len);
 
-
     printf("\n=== Test ChaCha20 Decrypt ===\n\n");
 
-    /* reiniciar contador para generar el mismo keystream */
     counter = 1;
 
-    chacha20_encrypt(
-        ciphertext,
-        decrypted,
-        len,
-        key,
-        counter,
-        nonce
-    );
+    chacha20_encrypt(ciphertext, decrypted, len, key, counter, nonce);
 
     decrypted[len] = '\0';
 
@@ -131,6 +140,29 @@ int main()
         printf("SUCCESS: plaintext recovered correctly\n");
     else
         printf("ERROR: decryption failed\n");
+
+
+    /* ================= RFC TEST (SEGURO) ================= */
+
+    printf("\n=== RFC Appendix ===\n\n");
+
+    uint8_t key_bytes[32] = {0};
+    uint8_t nonce_bytes[12] = {0};
+
+    uint32_t key_rfc[8];
+    uint32_t nonce_rfc[3];
+    uint32_t out_rfc[16];
+    uint8_t keystream[64];
+
+    bytes_to_words(key_bytes, key_rfc, 8);
+    bytes_to_words(nonce_bytes, nonce_rfc, 3);
+
+    chacha20_block(key_rfc, 0, nonce_rfc, out_rfc);
+
+    words_to_bytes(out_rfc, keystream, 16);
+
+    printf("Keystream:\n");
+    print_hex(keystream, 64);
 
     return 0;
 }
